@@ -38,6 +38,17 @@
 #include <iostream>
 
 
+#if defined( __APPLE__)
+
+// versionsort is also not present in mac
+#include "versionsort/strverscmp.c"
+#include "versionsort/versionsort.c"
+// mac specific header
+#include <mach-o/dyld.h>
+
+#endif
+
+
 #if defined(__CYGWIN__)
 
 #include <sys/cygwin.h>
@@ -64,7 +75,7 @@
 #endif //__CYGWIN__
 
 
-#define VERSION_STRING "3.0.7"
+#define VERSION_STRING "3.0.8"
 
 
 // folders
@@ -1360,10 +1371,10 @@ int TestSystemIMG(const char *path_systemimg_file)
 	int res;
 	int exit_code = 0;
 
-#ifdef USE_SYSTEM_CALL
-	res = system_args("e2fsck -fn \"%s\"", path_systemimg_file);
-#else
+#if defined(__CYGWIN__) || defined(__APPLE__)
 	res = run_program("e2fsck", "-fn", path_systemimg_file, NULL);
+#else
+	res = system_args("e2fsck -fn \"%s\"", path_systemimg_file);
 #endif
 
 	if (res != 0) {
@@ -2045,7 +2056,14 @@ int main(int argc, char **argv)
 	{
 		char full_path_to_self[PATH_MAX];
 		ssize_t len;
-
+		
+#if defined(__APPLE__)
+		char path[1024];
+		uint32_t size = sizeof(path);
+		_NSGetExecutablePath(path, &size);
+		full_path_to_maindir = path;
+		full_path_to_maindir = full_path_to_maindir.substr(0, full_path_to_maindir.find_last_of(".") - 1);
+#else
 		//realpath("/proc/self/exe", tst);
 		len = readlink("/proc/self/exe", full_path_to_self, sizeof(full_path_to_self));
 		if (len == -1) {
@@ -2060,6 +2078,7 @@ int main(int argc, char **argv)
 
 		full_path_to_maindir = full_path_to_self;
 		full_path_to_maindir = full_path_to_maindir.substr(0, full_path_to_maindir.find_last_of('/'));
+#endif
 
 #if defined(__CYGWIN__)
 		full_path_to_bins = full_path_to_maindir + "/" + "bin";
